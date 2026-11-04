@@ -1,5 +1,7 @@
 package app.exteraless.plugins.xposed;
 
+import android.os.SystemClock;
+
 import com.chaquo.python.PyObject;
 import org.telegram.ui.ActionBar.ActionBar;
 
