@@ -21,7 +21,7 @@ import de.robv.android.xposed.XC_MethodHook;
 public class PyMethodHook extends XC_MethodHook {
 
     private final String pluginId;
-    private final ThreadLocal<java.util.IdentityHashMap<MethodHookParam, ActionBar.UnreadImageView>> badgeDraws = new ThreadLocal<>();
+    private static final ThreadLocal<java.util.IdentityHashMap<MethodHookParam, ActionBar.UnreadImageView>> BADGE_DRAWS = ThreadLocal.withInitial(java.util.IdentityHashMap::new);
     private final PyObject handler;
     private final PyObject beforeCall;
     private final PyObject afterCall;
@@ -75,14 +75,10 @@ public class PyMethodHook extends XC_MethodHook {
     protected void beforeHookedMethod(MethodHookParam param) {
         if (afterCall != null && param.thisObject instanceof ActionBar.UnreadImageView
                 && param.method != null && "onDraw".equals(param.method.getName())
-                && HookFilter.evaluateAll(afterFilters, param, false)
-                && ownsUnreadBadge(param.thisObject)) {
+                && ownsUnreadBadge(param.thisObject)
+                && HookFilter.evaluateAll(afterFilters, param, false)) {
             ActionBar.UnreadImageView view = (ActionBar.UnreadImageView) param.thisObject;
-            java.util.IdentityHashMap<MethodHookParam, ActionBar.UnreadImageView> draws = badgeDraws.get();
-            if (draws == null) {
-                draws = new java.util.IdentityHashMap<>();
-                badgeDraws.set(draws);
-            }
+            java.util.IdentityHashMap<MethodHookParam, ActionBar.UnreadImageView> draws = BADGE_DRAWS.get();
             draws.put(param, view);
             view.beginPluginUnreadBadge();
         }
@@ -100,15 +96,10 @@ public class PyMethodHook extends XC_MethodHook {
                 HookNumbers.coerce(param);
             }
         } finally {
-            java.util.IdentityHashMap<MethodHookParam, ActionBar.UnreadImageView> draws = badgeDraws.get();
-            if (draws != null) {
-                ActionBar.UnreadImageView view = draws.remove(param);
-                if (view != null) {
-                    view.endPluginUnreadBadge();
-                }
-                if (draws.isEmpty()) {
-                    badgeDraws.remove();
-                }
+            java.util.IdentityHashMap<MethodHookParam, ActionBar.UnreadImageView> draws = BADGE_DRAWS.get();
+            ActionBar.UnreadImageView view = draws.remove(param);
+            if (view != null) {
+                view.endPluginUnreadBadge();
             }
         }
     }
@@ -124,22 +115,39 @@ public class PyMethodHook extends XC_MethodHook {
 
     private PyObject badgePlugin;
     private boolean badgePluginResolved;
+    private long lastBadgeCheck = 0L;
+    private boolean lastBadgeResult = false;
+    private Object lastBadgeTarget = null;
 
     private boolean ownsUnreadBadge(Object view) {
+        long now = SystemClock.elapsedRealtime();
+        if (lastBadgeTarget == view && now - lastBadgeCheck < 250) {
+            return lastBadgeResult;
+        }
         try {
             if (!badgePluginResolved) {
-                badgePlugin = handler.get("plugin");
+                badgePlugin = handler != null && handler.containsKey("plugin") ? handler.get("plugin") : null;
                 badgePluginResolved = true;
             }
             PyObject plugin = badgePlugin;
             if (plugin == null) {
+                lastBadgeResult = false;
+                lastBadgeCheck = now;
+                lastBadgeTarget = view;
                 return false;
             }
-            PyObject target = plugin.get("current_back_button");
-            PyObject count = plugin.get("unread_count");
-            return target != null && target.toJava(Object.class) == view
+            PyObject target = plugin.containsKey("current_back_button") ? plugin.get("current_back_button") : null;
+            PyObject count = plugin.containsKey("unread_count") ? plugin.get("unread_count") : null;
+            boolean res = target != null && target.toJava(Object.class) == view
                     && count != null && count.toInt() > 0;
-        } catch (RuntimeException ignored) {
+            lastBadgeResult = res;
+            lastBadgeCheck = now;
+            lastBadgeTarget = view;
+            return res;
+        } catch (Throwable ignored) {
+            lastBadgeResult = false;
+            lastBadgeCheck = now;
+            lastBadgeTarget = view;
             return false;
         }
     }

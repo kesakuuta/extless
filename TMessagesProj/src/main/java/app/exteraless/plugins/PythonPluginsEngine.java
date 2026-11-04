@@ -440,7 +440,9 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
             return (String) cached[0];
         }
         PluginsWatchdog watchdog = PluginsController.getInstance().getWatchdog();
-        watchdog.notePluginEnter(pluginId);
+        if (watchdog != null) {
+            watchdog.notePluginEnter(pluginId);
+        }
         try {
             String json = loader.callAttr("get_settings_json", pluginId).toJava(String.class);
             if (json != null) {
@@ -451,7 +453,9 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
             FileLog.e("PluginsEngine: getSettingsJson failed for " + pluginId, t);
             return null;
         } finally {
-            watchdog.notePluginExit(pluginId);
+            if (watchdog != null) {
+                watchdog.notePluginExit(pluginId);
+            }
         }
     }
 
@@ -467,7 +471,9 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
             return null;
         }
         PluginsWatchdog watchdog = PluginsController.getInstance().getWatchdog();
-        watchdog.notePluginEnter(pluginId);
+        if (watchdog != null) {
+            watchdog.notePluginEnter(pluginId);
+        }
         try {
             PyObject result = loader.callAttr("get_custom_setting_view", pluginId, viewId, context);
             Object content = result == null ? null : result.toJava(Object.class);
@@ -490,7 +496,9 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
             FileLog.e("PluginsEngine: getSettingsCustomContent failed for " + pluginId, t);
             return null;
         } finally {
-            watchdog.notePluginExit(pluginId);
+            if (watchdog != null) {
+                watchdog.notePluginExit(pluginId);
+            }
         }
     }
 
@@ -504,7 +512,9 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
             return false;
         }
         PluginsWatchdog watchdog = PluginsController.getInstance().getWatchdog();
-        watchdog.notePluginEnter(pluginId);
+        if (watchdog != null) {
+            watchdog.notePluginEnter(pluginId);
+        }
         try {
             if (longClick) {
                 factory.onLongClick(plugin, item, view);
@@ -514,7 +524,9 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
         } catch (Throwable t) {
             FileLog.e("PluginsEngine: custom setting click failed for " + pluginId, t);
         } finally {
-            watchdog.notePluginExit(pluginId);
+            if (watchdog != null) {
+                watchdog.notePluginExit(pluginId);
+            }
         }
         return true;
     }
@@ -552,19 +564,37 @@ public class PythonPluginsEngine extends com.exteragram.messenger.plugins.Python
             return null;
         }
         PluginsWatchdog watchdog = PluginsController.getInstance().getWatchdog();
-        watchdog.notePluginEnter(pluginId);
+        if (watchdog != null) {
+            watchdog.notePluginEnter(pluginId);
+        }
         String previousRuntime = PluginRuntime.enter(pluginId);
         try {
-            Object[] callArgs = new Object[args.length + 1];
-            callArgs[0] = pluginId;
-            System.arraycopy(args, 0, callArgs, 1, args.length);
-            return loader.callAttr(method, callArgs);
+            if (args == null || args.length == 0) {
+                return loader.callAttr(method, pluginId);
+            } else if (args.length == 1) {
+                return loader.callAttr(method, pluginId, args[0]);
+            } else if (args.length == 2) {
+                return loader.callAttr(method, pluginId, args[0], args[1]);
+            } else if (args.length == 3) {
+                return loader.callAttr(method, pluginId, args[0], args[1], args[2]);
+            } else {
+                Object[] callArgs = new Object[args.length + 1];
+                callArgs[0] = pluginId;
+                System.arraycopy(args, 0, callArgs, 1, args.length);
+                return loader.callAttr(method, callArgs);
+            }
         } catch (Throwable t) {
-            watchdog.handlePluginError(pluginId, t);
+            if (watchdog != null) {
+                watchdog.handlePluginError(pluginId, t);
+            } else {
+                FileLog.e("PluginsEngine: error in plugin " + pluginId, t);
+            }
             return null;
         } finally {
             PluginRuntime.exit(previousRuntime);
-            watchdog.notePluginExit(pluginId);
+            if (watchdog != null) {
+                watchdog.notePluginExit(pluginId);
+            }
         }
     }
 

@@ -31,7 +31,15 @@ public final class PythonThreadState {
             return;
         }
         final int[] calls = calls();
-        if (calls[0] < 0 || ++calls[0] < PIN_AFTER_CALLS) {
+        if (calls[0] < 0) {
+            return;
+        }
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            calls[0] = -1;
+            pin();
+            return;
+        }
+        if (++calls[0] < PIN_AFTER_CALLS) {
             return;
         }
         calls[0] = -1;

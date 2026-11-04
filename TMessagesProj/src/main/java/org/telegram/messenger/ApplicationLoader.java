@@ -358,6 +358,7 @@ public class ApplicationLoader extends Application implements CameraXConfig.Prov
 
         super.onCreate();
         installCrashReportFilter();
+        app.exteraless.memory.MemoryMonitor.install(this);
 
         // AndroidUtilities must be initialized before FileLog
         final String helloWorld = AndroidUtilities.getHelloWorld();

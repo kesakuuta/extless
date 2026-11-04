@@ -112,9 +112,9 @@ public class PluginsWatchdog {
 
     /** Один заход в код плагина. Сравнивается по ссылке — так проверка узнаёт «тот же самый». */
     public static final class ExecutionInfo {
-        final String pluginId;
-        final long mainEnterNanos;
-        final long startNanos;
+        volatile String pluginId;
+        volatile long mainEnterNanos;
+        volatile long startNanos;
         volatile boolean markerWritten;
 
         ExecutionInfo(String pluginId, long mainEnterNanos, long startNanos) {
@@ -130,8 +130,8 @@ public class PluginsWatchdog {
 
     /** Кадр стека вызовов плагинов в одном потоке. Трогает только сам поток. */
     private static final class Frame {
-        final String pluginId;
-        final long mainEnterNanos;
+        String pluginId;
+        long mainEnterNanos;
 
         Frame(String pluginId, long mainEnterNanos) {
             this.pluginId = pluginId;
@@ -145,8 +145,20 @@ public class PluginsWatchdog {
     private final ConcurrentHashMap<Thread, ExecutionInfo> executingPlugins = new ConcurrentHashMap<>();
     /** Поток -> заход, признанный зависшим. */
     private final ConcurrentHashMap<Thread, ExecutionInfo> frozenExecutions = new ConcurrentHashMap<>();
-    /** Стек заходов текущего потока: внешний кадр остаётся владельцем потока. */
-    private final ThreadLocal<ArrayDeque<Frame>> frames = ThreadLocal.withInitial(ArrayDeque::new);
+
+    private static final int MAX_FRAMES = 32;
+    private static final class ThreadStack {
+        final Frame[] frames = new Frame[MAX_FRAMES];
+        final ExecutionInfo executionInfo = new ExecutionInfo(null, 0L, 0L);
+        int depth = 0;
+
+        ThreadStack() {
+            for (int i = 0; i < MAX_FRAMES; i++) {
+                frames[i] = new Frame(null, 0L);
+            }
+        }
+    }
+    private final ThreadLocal<ThreadStack> threadStacks = ThreadLocal.withInitial(ThreadStack::new);
 
     private final ConcurrentHashMap<String, AtomicLong> mainThreadNanos = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> overBudgetWindows = new ConcurrentHashMap<>();
@@ -271,11 +283,20 @@ public class PluginsWatchdog {
         final long now = System.nanoTime();
         final long mainEnter = thread == mainThread ? now : 0L;
 
-        ArrayDeque<Frame> stack = frames.get();
-        stack.push(new Frame(pluginId, mainEnter));
+        ThreadStack ts = threadStacks.get();
+        if (ts.depth < MAX_FRAMES) {
+            Frame f = ts.frames[ts.depth];
+            f.pluginId = pluginId;
+            f.mainEnterNanos = mainEnter;
+            ts.depth++;
+        }
 
-        if (stack.size() == 1) {
-            ExecutionInfo info = new ExecutionInfo(pluginId, mainEnter, now);
+        if (ts.depth == 1) {
+            ExecutionInfo info = ts.executionInfo;
+            info.pluginId = pluginId;
+            info.mainEnterNanos = mainEnter;
+            info.startNanos = now;
+            info.markerWritten = false;
             executingPlugins.put(thread, info);
             lastActivityNanos = now;
             if (budgetSweep == null && scheduler != null) {
@@ -285,7 +306,7 @@ public class PluginsWatchdog {
             // Этот поток раньше висел — значит, отвис.
             ExecutionInfo wasFrozen = frozenExecutions.remove(thread);
             if (wasFrozen != null) {
-                if (wasFrozen.pluginId.equals(pluginId)) {
+                if (pluginId.equals(wasFrozen.pluginId)) {
                     // Тот же плагин снова в работе: считаем, что он всё ещё висит.
                     frozenExecutions.put(thread, info);
                 } else {
@@ -328,18 +349,24 @@ public class PluginsWatchdog {
         if (pluginId == null) {
             return;
         }
-        ArrayDeque<Frame> stack = frames.get();
-        Frame frame = stack.peek();
-        if (frame == null || !frame.pluginId.equals(pluginId)) {
+        ThreadStack ts = threadStacks.get();
+        if (ts.depth <= 0) {
             return;
         }
-        stack.pop();
+        Frame frame = ts.frames[ts.depth - 1];
+        if (!pluginId.equals(frame.pluginId)) {
+            return;
+        }
+        ts.depth--;
 
         if (frame.mainEnterNanos != 0L) {
-            mainThreadNanos.computeIfAbsent(pluginId, id -> new AtomicLong())
-                    .addAndGet(System.nanoTime() - frame.mainEnterNanos);
+            AtomicLong nanos = mainThreadNanos.get(pluginId);
+            if (nanos == null) {
+                nanos = mainThreadNanos.computeIfAbsent(pluginId, id -> new AtomicLong());
+            }
+            nanos.addAndGet(System.nanoTime() - frame.mainEnterNanos);
         }
-        if (!stack.isEmpty()) {
+        if (ts.depth != 0) {
             return;
         }
 

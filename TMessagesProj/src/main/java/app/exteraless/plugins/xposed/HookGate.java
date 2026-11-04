@@ -213,11 +213,13 @@ public final class HookGate {
                 }
             }
             final boolean isStatic = Modifier.isStatic(member.getModifiers());
+            Object thisObj = (!isStatic && args != null && args.length > 0) ? args[0] : null;
+            Object[] realArgs = isStatic ? args : (args != null && args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new Object[0]);
             try {
-                return XposedBridge.invokeOriginalMethod(member, isStatic ? null : args[0],
-                        isStatic ? args : Arrays.copyOfRange(args, 1, args.length));
+                return XposedBridge.invokeOriginalMethod(member, thisObj, realArgs);
             } catch (InvocationTargetException e) {
-                throw e.getCause();
+                Throwable cause = e.getCause();
+                throw cause != null ? cause : e;
             }
         }
 

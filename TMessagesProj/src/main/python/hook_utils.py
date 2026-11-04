@@ -101,11 +101,7 @@ def _find_field(class_obj, name: str):
     current = class_obj
     while current is not None:
         try:
-            fields = current.getDeclaredFields()
-            for index in range(len(fields)):
-                field = fields[index]
-                if str(field.getName()) == name:
-                    return field
+            return current.getDeclaredField(name)
         except Exception:
             pass
         try:

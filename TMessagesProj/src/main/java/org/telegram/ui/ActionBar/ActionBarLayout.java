@@ -710,7 +710,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             scrimPaint = new Paint();
         }
 
-        if (USE_ACTIONBAR_CROSSFADE) {
+        if (isUseActionBarCrossfade()) {
             setWillNotDraw(false);
             menuDrawable = new MenuDrawable(MenuDrawable.TYPE_DEFAULT);
             menuDrawable.setRoundCap();
@@ -1183,7 +1183,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                     (int) (predictiveBackAnimation.getScrimAlpha(Theme.isCurrentThemeDark()) * k), 0, 0, 0));
             canvas.drawRect(0, 0, getWidth(), getHeight(), scrimPaint);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !isSheet && (!USE_SPRING_ANIMATION || !isTransitionAnimationInProgress() && !animationInProgress) && (translationX != 0 || overrideWidthOffset != -1)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !isSheet && (!isUseSpringAnimation() || !isTransitionAnimationInProgress() && !animationInProgress) && (translationX != 0 || overrideWidthOffset != -1)) {
             if (child == containerView) {
                 final WindowInsets insets = getRootWindowInsets();
                 if (insets != null) {
@@ -1256,7 +1256,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             int widthOffset = overrideWidthOffset != -1 ? overrideWidthOffset : width - translationX;
             int top = getTop(widthOffset, (float) width);
             if (child == containerView) {
-                final int alpha = USE_SPRING_ANIMATION ? MathUtils.clamp(255 * widthOffset / width, 0, 255) : MathUtils.clamp(255 * widthOffset / dp(20), 0, 255);
+                final int alpha = isUseSpringAnimation() ? MathUtils.clamp(255 * widthOffset / width, 0, 255) : MathUtils.clamp(255 * widthOffset / dp(20), 0, 255);
                 if (alpha > 0) {
                     final int tabsHeight = getBottomTabsHeight(false);
                     final int additionalHeight;
@@ -1282,7 +1282,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                 // exteraGram 12.9.0, drawChild: (springAnimations ? 102 : 120) * opacity.
                 // У нас при пружинах было 0x7a=122 — нижний экран затемнялся заметно сильнее.
                 // Режим crossfade — специфика NagramX, у exteraGram его нет, значение оставлено.
-                scrimPaint.setColor(Color.argb((int) ((USE_SPRING_ANIMATION ? USE_ACTIONBAR_CROSSFADE ? 0x29 : 102 : 120) * opacity), 0x00, 0x00, 0x00));
+                scrimPaint.setColor(Color.argb((int) ((isUseSpringAnimation() ? isUseActionBarCrossfade() ? 0x29 : 102 : 120) * opacity), 0x00, 0x00, 0x00));
                 if (overrideWidthOffset != -1) {
                     canvas.drawRect(0, top, getWidth(), getHeight() * 1.5f, scrimPaint);
                 } else {
@@ -1450,7 +1450,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         containerViewBack.setTranslationX(0);
         containerView.setLayerType(LAYER_TYPE_NONE, null);
         setInnerTranslationX(0);
-        if (USE_ACTIONBAR_CROSSFADE) {
+        if (isUseActionBarCrossfade()) {
             invalidateActionBars();
         }
     }
@@ -1516,7 +1516,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         currentFragment.prepareFragmentToSlide(true, true);
         lastFragment.prepareFragmentToSlide(false, true);
 
-        if (USE_ACTIONBAR_CROSSFADE) {
+        if (isUseActionBarCrossfade()) {
             swipeProgress = 0f;
             invalidateActionBars();
         }
@@ -1572,9 +1572,9 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                             setInnerTranslationX(dx / (float) getWidth() * (5 * dp(56)));
                         } else {
                             containerView.setTranslationX(dx);
-                            if (USE_SPRING_ANIMATION) {
+                            if (isUseSpringAnimation()) {
                                 containerViewBack.setTranslationX(-(containerView.getMeasuredWidth() - dx) * 0.35f);
-                                if (USE_ACTIONBAR_CROSSFADE) {
+                                if (isUseActionBarCrossfade()) {
                                     swipeProgress = MathUtils.clamp((float) dx / containerView.getMeasuredWidth(), 0f, 1f);
                                 }
                                 if (containerView.getMeasuredWidth() > 0) {
@@ -1915,7 +1915,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         float distToMove;
         boolean overrideTransition = currentFragment.shouldOverrideSlideTransition(false, backAnimation);
 
-        if (USE_SPRING_ANIMATION) {
+        if (isUseSpringAnimation()) {
             FloatValueHolder valueHolder = new FloatValueHolder((x / containerView.getMeasuredWidth()) * SPRING_MULTIPLIER);
             currentSpringAnimation = new SpringAnimation(valueHolder)
                     .setSpring(new SpringForce(backAnimation ? 0f : SPRING_MULTIPLIER)
@@ -1933,7 +1933,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                 containerView.setTranslationX(progress * containerView.getMeasuredWidth());
                 containerViewBack.setTranslationX(-(containerView.getMeasuredWidth() - progress * containerView.getMeasuredWidth()) * 0.35f);
                 setInnerTranslationX(progress * containerView.getMeasuredWidth());
-                if (USE_ACTIONBAR_CROSSFADE) {
+                if (isUseActionBarCrossfade()) {
                     swipeProgress = progress;
                 }
                 if (!m3PredictiveBack && !predictiveBackInProgress) {
@@ -2115,7 +2115,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         containerViewBack.setScaleY(1.0f);
         containerViewBack.setTranslationX(0);
         containerViewBack.setTranslationY(0);
-        if (USE_ACTIONBAR_CROSSFADE) {
+        if (isUseActionBarCrossfade()) {
             invalidateActionBars();
         }
     }
@@ -2140,7 +2140,8 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         if (transitionAnimationPreviewMode) {
             return false;
         }
-        if (transitionAnimationInProgress && (transitionAnimationStartTime < System.currentTimeMillis() - 1500 || inPreviewMode)) {
+        if (transitionAnimationInProgress && (transitionAnimationStartTime < System.currentTimeMillis() - 1500 || inPreviewMode
+                || isUseSpringAnimation() && currentSpringAnimation != null && animationProgress >= FINISH_EARLY_PROGRESS)) {
             onAnimationEndCheck(true);
         }
         return transitionAnimationInProgress;
@@ -2205,8 +2206,8 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
             animationProgress = 0.0f;
             lastFrameTime = System.nanoTime() / 1000000;
         }
-        if (USE_SPRING_ANIMATION) {
-            if (USE_ACTIONBAR_CROSSFADE) {
+        if (isUseSpringAnimation()) {
+            if (isUseActionBarCrossfade()) {
                 swipeProgress = open ? 1f : 0f;
                 invalidateActionBars();
             }
@@ -2225,7 +2226,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                             .setDampingRatio(preview ? 0.6f : 1f));
             currentSpringAnimation.addUpdateListener((animation, value, velocity) -> {
                 animationProgress = value / SPRING_MULTIPLIER;
-                if (USE_ACTIONBAR_CROSSFADE) {
+                if (isUseActionBarCrossfade()) {
                     swipeProgress = MathUtils.clamp(open ? (1f - animationProgress) : animationProgress, 0f, 1f);
                 }
                 if (newFragment != null) {
@@ -2586,7 +2587,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         containerView = containerViewBack;
         containerViewBack = temp;
         containerView.setVisibility(View.VISIBLE);
-        if (USE_ACTIONBAR_CROSSFADE) {
+        if (isUseActionBarCrossfade()) {
             swipeProgress = 1f;
         }
         setInnerTranslationX(0);
@@ -2724,7 +2725,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
                     animation = fragment.onCustomTransitionAnimation(true, () -> onAnimationEndCheck(false));
                 }
                 if (animation == null) {
-                    if (USE_SPRING_ANIMATION) {
+                    if (isUseSpringAnimation()) {
                         if (preview) {
                             containerView.setAlpha(0.0f);
                             containerView.setTranslationX(0.0f);
@@ -2985,7 +2986,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
         layoutParams.height = LayoutHelper.MATCH_PARENT;
         fragment.fragmentView.setLayoutParams(layoutParams);
 
-        if (USE_SPRING_ANIMATION) {
+        if (isUseSpringAnimation()) {
             var view = fragment.fragmentView;
             rect.set(view.getLeft(), view.getTop(), view.getRight(), view.getBottom());
             float fromMenuY;
@@ -4132,13 +4133,18 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     public static final int BACK_ANIMATION_SPRING = 1;
     public static final int BACK_ANIMATION_PREDICTIVE = 2;
     public static final int BACK_ANIMATION_SLIDE = 3;
-    private static final boolean USE_SPRING_ANIMATION = NaConfig.INSTANCE.getBackAnimationStyle().Int() == BACK_ANIMATION_SPRING;
-    private static final boolean USE_ACTIONBAR_CROSSFADE = USE_SPRING_ANIMATION && NaConfig.INSTANCE.getSpringAnimationCrossfade().Bool();
-    private static final float SPRING_STIFFNESS = 900f;
+    public static boolean isUseSpringAnimation() {
+        return NaConfig.INSTANCE.getBackAnimationStyle().Int() == BACK_ANIMATION_SPRING;
+    }
+    public static boolean isUseActionBarCrossfade() {
+        return isUseSpringAnimation() && NaConfig.INSTANCE.getSpringAnimationCrossfade().Bool();
+    }
+    private static final float SPRING_STIFFNESS = 700f;
     private static final float SPRING_STIFFNESS_PREVIEW = 650f;
     private static final float SPRING_STIFFNESS_PREVIEW_OUT = 800f;
     private static final float SPRING_STIFFNESS_PREVIEW_EXPAND = 750f;
     private static final float SPRING_MULTIPLIER = 1000f;
+    private static final float FINISH_EARLY_PROGRESS = 0.90f;
     private float swipeProgress;
     private SpringAnimation currentSpringAnimation;
     private MenuDrawable menuDrawable;
@@ -4155,7 +4161,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
     }
 
     public boolean isActionBarInCrossfade() {
-        if (!USE_ACTIONBAR_CROSSFADE) {
+        if (!isUseActionBarCrossfade()) {
             return false;
         }
         // Во время M3-жеста заголовок обязан ехать вместе с карточкой.

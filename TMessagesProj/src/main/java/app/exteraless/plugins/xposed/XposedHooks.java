@@ -507,6 +507,7 @@ public final class XposedHooks {
 
     static final class PyResult {
         static final PyResult ERROR = new PyResult(false, null);
+        static final PyResult SUCCESS_NULL = new PyResult(true, null);
 
         final boolean ok;
         final PyObject value;
@@ -517,7 +518,7 @@ public final class XposedHooks {
         }
 
         static PyResult of(PyObject value) {
-            return new PyResult(true, value);
+            return value == null ? SUCCESS_NULL : new PyResult(true, value);
         }
     }
 

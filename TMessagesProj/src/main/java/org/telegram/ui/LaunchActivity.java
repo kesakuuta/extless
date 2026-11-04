@@ -476,6 +476,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         }
         getWindow().setBackgroundDrawable(new ActivityWindowEmptyBackgroundDrawable());
         getWindow().setFormat(PixelFormat.OPAQUE);
+        AndroidUtilities.setPreferredMaxRefreshRate(getWindow());
 
         flagSecureReason = new FlagSecureReason(getWindow(), () -> SharedConfig.passcodeHash.length() > 0 && !SharedConfig.allowScreenCapture, true);
         flagSecureReason.attach();
